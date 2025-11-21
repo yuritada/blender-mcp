@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import base64
 from urllib.parse import urlparse
+from ...connect import get_blender_connection, mcp, logger
 
 
 

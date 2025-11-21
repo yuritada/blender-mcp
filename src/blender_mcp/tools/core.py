@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 import base64
 from urllib.parse import urlparse
-from ..connect import get_blender_connection
+from ..connect import get_blender_connection, mcp, logger  # <-- mcpとloggerを追加
 
 @mcp.tool()
 def execute_blender_code(ctx: Context, code: str) -> str:

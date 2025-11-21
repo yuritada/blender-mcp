@@ -1,42 +1,19 @@
-# blender_mcp_server.py
-from mcp.server.fastmcp import FastMCP, Context, Image
-import socket
-import json
-import asyncio
-import logging
-import tempfile
-from dataclasses import dataclass
-from contextlib import asynccontextmanager
-from typing import AsyncIterator, Dict, Any, List
-import os
-from pathlib import Path
-import base64
-from urllib.parse import urlparse
-from blender_mcp.connect import BlenderConnection, get_blender_connection, _blender_connection, _polyhaven_enabled
+# src/blender_mcp/main.py
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, 
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger("BlenderMCPServer")
+# 不要な import は削除し、以下のようにシンプルにします
+from blender_mcp.connect import mcp
 
-# Default configuration
-DEFAULT_HOST = "localhost"
-DEFAULT_PORT = 9876
-
-
-# Create the MCP server with lifespan support
-mcp = FastMCP(
-    "BlenderMCP",
-    lifespan=server_lifespan
-)
-
-# Resource endpoints
-
-
-# Main execution
+# 重要: 各モジュールを import することで、@mcp.tool デコレータが実行され、
+# mcp オブジェクトにツールが登録されます。
+import blender_mcp.tools.core
+import blender_mcp.tools.assets.polyhaven
+import blender_mcp.tools.assets.hyper3d
+import blender_mcp.tools.assets.sketchfab
+import blender_mcp.tools.assets.prompt
 
 def main():
     """Run the MCP server"""
+    # 既に tools 内で登録が完了している mcp インスタンスを起動
     mcp.run()
 
 if __name__ == "__main__":

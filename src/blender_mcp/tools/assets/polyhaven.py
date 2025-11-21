@@ -11,20 +11,14 @@ import os
 from pathlib import Path
 import base64
 from urllib.parse import urlparse
-
-
+from ...connect import get_blender_connection, mcp, logger, global_state # <-- 階層が深いので ...connect に注意
 
 @mcp.tool()
 def get_polyhaven_categories(ctx: Context, asset_type: str = "hdris") -> str:
-    """
-    Get a list of categories for a specific asset type on Polyhaven.
-    
-    Parameters:
-    - asset_type: The type of asset to get categories for (hdris, textures, models, all)
-    """
     try:
         blender = get_blender_connection()
-        if not _polyhaven_enabled:
+        # グローバル設定を参照
+        if not global_state["polyhaven_enabled"]: 
             return "PolyHaven integration is disabled. Select it in the sidebar in BlenderMCP, then run it again."
         result = blender.send_command("get_polyhaven_categories", {"asset_type": asset_type})
         

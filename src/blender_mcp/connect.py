@@ -164,26 +164,24 @@ class BlenderConnection:
             self.sock = None
             raise Exception(f"Communication error with Blender: {str(e)}")
 
-
-
-# Global connection for resources (since resources can't access context)
+# Global connection & State
 _blender_connection = None
-_polyhaven_enabled = False  # Add this global variable
+
+global_state = {
+    "polyhaven_enabled": False
+}
 
 def get_blender_connection():
     """Get or create a persistent Blender connection"""
-    global _blender_connection, _polyhaven_enabled  # Add _polyhaven_enabled to globals
+    global _blender_connection
     
     # If we have an existing connection, check if it's still valid
     if _blender_connection is not None:
         try:
-            # First check if PolyHaven is enabled by sending a ping command
             result = _blender_connection.send_command("get_polyhaven_status")
-            # Store the PolyHaven status globally
-            _polyhaven_enabled = result.get("enabled", False)
+            global_state["polyhaven_enabled"] = result.get("enabled", False)
             return _blender_connection
         except Exception as e:
-            # Connection is dead, close it and create a new one
             logger.warning(f"Existing connection is no longer valid: {str(e)}")
             try:
                 _blender_connection.disconnect()
@@ -204,33 +202,27 @@ def get_blender_connection():
     
     return _blender_connection
 
-
 @asynccontextmanager
 async def server_lifespan(server: FastMCP) -> AsyncIterator[Dict[str, Any]]:
     """Manage server startup and shutdown lifecycle"""
-    # We don't need to create a connection here since we're using the global connection
-    # for resources and tools
-    
     try:
-        # Just log that we're starting up
         logger.info("BlenderMCP server starting up")
-        
-        # Try to connect to Blender on startup to verify it's available
         try:
-            # This will initialize the global connection if needed
-            blender = get_blender_connection()
+            get_blender_connection()
             logger.info("Successfully connected to Blender on startup")
         except Exception as e:
             logger.warning(f"Could not connect to Blender on startup: {str(e)}")
-            logger.warning("Make sure the Blender addon is running before using Blender resources or tools")
-        
-        # Return an empty context - we're using the global connection
         yield {}
     finally:
-        # Clean up the global connection on shutdown
         global _blender_connection
         if _blender_connection:
             logger.info("Disconnecting from Blender on shutdown")
             _blender_connection.disconnect()
             _blender_connection = None
         logger.info("BlenderMCP server shut down")
+
+
+mcp = FastMCP(
+    "BlenderMCP",
+    lifespan=server_lifespan
+)
