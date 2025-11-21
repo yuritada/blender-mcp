@@ -12,10 +12,16 @@ from pathlib import Path
 import base64
 from urllib.parse import urlparse
 
+import sys # 追加
+import logging
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, 
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# stream=sys.stderr を追加して、標準出力（通信用）にログが混ざらないようにする
+logging.basicConfig(
+    level=logging.INFO, 
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stderr 
+)
 logger = logging.getLogger("BlenderMCPServer")
 
 # Default configuration
