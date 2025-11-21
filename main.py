@@ -1,4 +1,4 @@
-from blender_mcp.server import main as server_main
+from src.blender_mcp import main as server_main
 
 def main():
     """Entry point for the blender-mcp package"""
