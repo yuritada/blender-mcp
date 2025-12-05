@@ -321,6 +321,7 @@ class BlenderMCPServer:
             "location": [obj.location.x, obj.location.y, obj.location.z],
             "rotation": [obj.rotation_euler.x, obj.rotation_euler.y, obj.rotation_euler.z],
             "scale": [obj.scale.x, obj.scale.y, obj.scale.z],
+            "dimensions": [obj.dimensions.x, obj.dimensions.y, obj.dimensions.z],
             "visible": obj.visible_get(),
             "materials": [],
         }
