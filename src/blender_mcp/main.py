@@ -10,7 +10,8 @@ import blender_mcp.tools.assets.polyhaven
 import blender_mcp.tools.assets.hyper3d
 import blender_mcp.tools.assets.sketchfab
 import blender_mcp.tools.assets.prompt
-import blender_mcp.tools.experiment
+import blender_mcp.tools.rules
+import blender_mcp.tools.knowledge
 
 def main():
     """Run the MCP server"""

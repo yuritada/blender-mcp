@@ -1,0 +1,12 @@
+[
+  {
+    "id": 1,
+    "category": "Door",
+    "description": "ドアのアスペクト比（高さ ÷ 幅）は、1.8以上でなければならない（美しい縦長比率）。"
+  },
+  {
+    "id": 2,
+    "category": "Window",
+    "description": "窓の上端（Top Height）は、隣接するドアの上端と高さを揃えなければならない。"
+  }
+]

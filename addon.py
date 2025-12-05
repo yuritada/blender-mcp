@@ -86,6 +86,40 @@ class BlenderMCPServer:
 
         print("BlenderMCP server stopped")
 
+    def create_grid_layout(self, object_type, rows, cols, spacing):
+            """ルール: 指定されたオブジェクトをグリッド状に配置する"""
+            try:
+                # 既存の選択を解除
+                bpy.ops.object.select_all(action='DESELECT')
+                
+                created_objects = []
+                
+                for i in range(rows):
+                    for j in range(cols):
+                        # ロジック: 座標計算
+                        location = (i * spacing, j * spacing, 0)
+                        
+                        # ロジック: オブジェクト生成
+                        if object_type == "cube":
+                            bpy.ops.mesh.primitive_cube_add(location=location)
+                        elif object_type == "sphere":
+                            bpy.ops.mesh.primitive_uv_sphere_add(location=location)
+                        else:
+                            bpy.ops.mesh.primitive_monkey_add(location=location)
+                            
+                        obj = bpy.context.active_object
+                        # ロジック: 命名規則
+                        obj.name = f"GridObj_{object_type}_{i}_{j}"
+                        created_objects.append(obj.name)
+                
+                return {
+                    "success": True, 
+                    "message": f"Created {len(created_objects)} objects in grid layout.",
+                    "objects": created_objects
+                }
+            except Exception as e:
+                return {"error": str(e)}
+
     def _server_loop(self):
         """Main server loop in a separate thread"""
         print("Server thread started")
@@ -207,6 +241,7 @@ class BlenderMCPServer:
             "get_polyhaven_status": self.get_polyhaven_status,
             "get_hyper3d_status": self.get_hyper3d_status,
             "get_sketchfab_status": self.get_sketchfab_status,
+            "create_grid_layout": self.create_grid_layout,
         }
 
         # Add Polyhaven handlers only if enabled
