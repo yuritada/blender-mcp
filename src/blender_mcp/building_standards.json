@@ -1,33 +1,46 @@
 {
   "metadata": {
-    "title": "Japanese Building Standards for 3D Validation",
-    "description": "建築基準法施行令に基づく、3Dオブジェクト検証用の数値規定セット",
-    "last_updated": "2025-12-05"
+    "title": "Japanese Building Standards for 3D Validation (Residential)",
+    "description": "建築基準法および同施行令に基づく、戸建て住宅3Dモデル検証用の数値規定セット。幾何学的検証要件を含む。",
+    "target_building_type": "Detached Residential House (General)",
+    "unit_system": "metric (meters)",
+    "version": "1.0.0",
+    "last_updated": "2025-12-12"
   },
   "regulations": [
     {
-      "id": "RULE_01_CEILING",
+      "id": "RULE_01_CEILING_AVG",
       "law_reference": "建築基準法施行令 第21条 (Article 21)",
       "category": "Habitable Room",
-      "target_object": "Room_Volume",
-      "description": "居室の天井の高さは、2.1メートル以上でなければならない。",
+      "target_object": "Room_Space",
+      "severity": "CRITICAL",
+      "description": "居室の天井の高さは、2.1メートル以上でなければならない。斜天井の場合は室の気積を床面積で除した平均高さで判定する。",
       "validation_logic": {
-        "parameter": "height_z",
+        "type": "calculated_value",
+        "calculation_method": "volume_integration",
+        "formula": "volume / floor_area",
         "operator": ">=",
         "threshold": 2.1,
         "unit": "m"
       },
-      "error_message": "天井高が不足しています。2.1m以上に修正してください。"
+      "error_message": "居室の平均天井高が2.1m未満です。気積を増やすか床面積を調整してください。"
     },
     {
-      "id": "RULE_02_STAIRS_RESIDENTIAL",
+      "id": "RULE_02_STAIRS_DIMENSIONS",
       "law_reference": "建築基準法施行令 第23条 (Article 23)",
       "category": "Stairs",
       "target_object": "Stair_Component",
-      "condition": "residential",
-      "description": "住宅の階段において、蹴上げ（1段の高さ）は23cm以下、踏面（1段の奥行き）は15cm以上でなければならない。",
+      "severity": "CRITICAL",
+      "description": "住宅の階段における寸法規定。有効幅75cm以上、蹴上げ23cm以下、踏面15cm以上（蹴込みを含まない）。",
       "validation_logic": {
         "and_conditions": [
+          {
+            "parameter": "effective_width",
+            "operator": ">=",
+            "threshold": 0.75,
+            "unit": "m",
+            "note": "Includes handrail relaxation (max 10cm projection)"
+          },
           {
             "parameter": "riser_height",
             "operator": "<=",
@@ -35,31 +48,116 @@
             "unit": "m"
           },
           {
-            "parameter": "tread_depth",
+            "parameter": "tread_depth_effective",
             "operator": ">=",
             "threshold": 0.15,
-            "unit": "m"
+            "unit": "m",
+            "note": "Excluding nosing (kekom)"
           }
         ]
       },
-      "error_message": "階段の寸法が住宅の基準を満たしていません（蹴上げ≦0.23m, 踏面≧0.15m）。"
+      "error_message": "階段寸法違反：有効幅75cm以上、蹴上げ23cm以下、踏面15cm以上のいずれかを満たしていません。"
     },
     {
-      "id": "RULE_03_LIGHTING",
-      "law_reference": "建築基準法 第28条 (Article 28)",
-      "category": "Lighting",
+      "id": "RULE_03_LIGHTING_RATIO",
+      "law_reference": "建築基準法 第28条 第1項 (Article 28-1)",
+      "category": "Environmental",
       "target_object": "Window",
       "parent_object": "Room_Floor",
+      "severity": "CRITICAL",
       "description": "居室には、床面積の1/7以上の有効採光面積を持つ窓を設けなければならない。",
       "validation_logic": {
         "type": "ratio_comparison",
-        "numerator": "window_area",
+        "numerator": "effective_lighting_area",
         "denominator": "floor_area",
         "operator": ">=",
         "threshold": 0.142857,
-        "note": "1/7 approx 0.1428"
+        "unit": "ratio",
+        "note": "Requires calculation of lighting coefficient (K) based on obstruction distance"
       },
-      "error_message": "採光面積が不足しています。窓を大きくするか数を増やして、床面積の1/7以上確保してください。"
+      "error_message": "有効採光面積が床面積の1/7未満です。窓の配置やサイズ、隣地境界線との距離を見直してください。"
+    },
+    {
+      "id": "RULE_04_VENTILATION_RATIO",
+      "law_reference": "建築基準法 第28条 第2項 (Article 28-2)",
+      "category": "Environmental",
+      "target_object": "Window",
+      "parent_object": "Room_Floor",
+      "severity": "CRITICAL",
+      "description": "居室には、床面積の1/20以上の換気有効面積が必要である（Fix窓は除外）。",
+      "validation_logic": {
+        "type": "ratio_comparison",
+        "numerator": "openable_window_area",
+        "denominator": "floor_area",
+        "operator": ">=",
+        "threshold": 0.05,
+        "unit": "ratio",
+        "filter": {
+          "property": "opening_type",
+          "exclude": ["FIXED", "PICTURE"]
+        }
+      },
+      "error_message": "換気有効面積が床面積の1/20未満です。開放可能な窓を増やしてください。"
+    },
+    {
+      "id": "RULE_05_HALLWAY_WIDTH_MIN",
+      "law_reference": "避難安全上の論理的要件 / 施行令第119条準用",
+      "category": "Hallway",
+      "target_object": "Corridor_Space",
+      "severity": "CRITICAL",
+      "description": "一般住宅の廊下幅は、階段幅との整合性及び避難のために最低0.75mを確保する。",
+      "validation_logic": {
+        "parameter": "min_clear_width",
+        "operator": ">=",
+        "threshold": 0.75,
+        "unit": "m"
+      },
+      "error_message": "廊下の有効幅が避難に必要な0.75mを下回っています。"
+    },
+    {
+      "id": "RULE_06_HALLWAY_WIDTH_REC",
+      "law_reference": "住宅性能表示制度 (等級3相当)",
+      "category": "Hallway",
+      "target_object": "Corridor_Space",
+      "severity": "WARNING",
+      "description": "推奨値：高齢者等配慮対策等級3相当の有効幅850mm（柱部分800mm）以上。",
+      "validation_logic": {
+        "parameter": "min_clear_width",
+        "operator": ">=",
+        "threshold": 0.85,
+        "unit": "m"
+      },
+      "error_message": "警告：廊下幅がバリアフリー推奨値(0.85m)を下回っています。"
+    },
+    {
+      "id": "RULE_07_DOOR_WIDTH",
+      "law_reference": "避難安全上の論理的要件",
+      "category": "Door",
+      "target_object": "Door_Opening",
+      "severity": "CRITICAL",
+      "description": "居室の出入り口有効幅は、階段幅との整合性を考慮し0.75m以上とする。",
+      "validation_logic": {
+        "parameter": "clear_opening_width",
+        "operator": ">=",
+        "threshold": 0.75,
+        "unit": "m"
+      },
+      "error_message": "ドアの有効開口幅が0.75m未満です。避難経路のボトルネックとなる可能性があります。"
+    },
+    {
+      "id": "RULE_08_DOOR_HEIGHT",
+      "law_reference": "一般常識的寸法 (Collision Safety)",
+      "category": "Door",
+      "target_object": "Door_Opening",
+      "severity": "WARNING",
+      "description": "ドアの高さは、一般的な通行の安全性を考慮し1.8m以上を推奨する。",
+      "validation_logic": {
+        "parameter": "height_z",
+        "operator": ">=",
+        "threshold": 1.8,
+        "unit": "m"
+      },
+      "error_message": "ドアの高さが1.8m未満です。頭部衝突のリスクがあります。"
     }
   ]
 }

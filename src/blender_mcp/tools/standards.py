@@ -123,8 +123,9 @@ def validate_object_compliance(ctx: Context, object_name: str, rule_id: str) -> 
         return "このルールの自動検証には、対象オブジェクトと親オブジェクト(床)の両方の面積情報が必要です。現在は手動で確認してください。"
 
     # 4. 結果の返却
-    is_all_passed = all("合格" in r for r in results)
-    summary = "検証合格" if is_all_passed else "検証不合格"
+    is_all_passed = all("不合格" not in r for r in results)
+    
+    summary = "✅ 検証合格" if is_all_passed else "❌ 検証不合格"
 
     return f"""
 検証レポート:
