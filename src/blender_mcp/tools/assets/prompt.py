@@ -20,7 +20,9 @@ def asset_creation_strategy() -> str:
     """Defines the preferred strategy for creating assets in Blender"""
     return """When creating 3D content in Blender, always start by checking if integrations are available:
 
-    0. Before anything, always check the scene from get_scene_info()
+    0. Before anything:
+       - Check the scene from get_scene_info()
+       - Check USER PREFERENCES using `get_architectural_rules()`. If the user has previously set rules (e.g., "Always make stairs red"), you MUST follow them unless instructed otherwise.
     1. First use the following tools to verify if the following integrations are enabled:
         1. PolyHaven
             Use get_polyhaven_status() to verify its status
