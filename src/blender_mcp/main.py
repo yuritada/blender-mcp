@@ -12,6 +12,7 @@ import blender_mcp.tools.assets.sketchfab
 import blender_mcp.tools.assets.prompt
 import blender_mcp.tools.rules
 import blender_mcp.tools.knowledge
+import blender_mcp.tools.standards
 
 def main():
     """Run the MCP server"""

@@ -1,0 +1,65 @@
+{
+  "metadata": {
+    "title": "Japanese Building Standards for 3D Validation",
+    "description": "建築基準法施行令に基づく、3Dオブジェクト検証用の数値規定セット",
+    "last_updated": "2025-12-05"
+  },
+  "regulations": [
+    {
+      "id": "RULE_01_CEILING",
+      "law_reference": "建築基準法施行令 第21条 (Article 21)",
+      "category": "Habitable Room",
+      "target_object": "Room_Volume",
+      "description": "居室の天井の高さは、2.1メートル以上でなければならない。",
+      "validation_logic": {
+        "parameter": "height_z",
+        "operator": ">=",
+        "threshold": 2.1,
+        "unit": "m"
+      },
+      "error_message": "天井高が不足しています。2.1m以上に修正してください。"
+    },
+    {
+      "id": "RULE_02_STAIRS_RESIDENTIAL",
+      "law_reference": "建築基準法施行令 第23条 (Article 23)",
+      "category": "Stairs",
+      "target_object": "Stair_Component",
+      "condition": "residential",
+      "description": "住宅の階段において、蹴上げ（1段の高さ）は23cm以下、踏面（1段の奥行き）は15cm以上でなければならない。",
+      "validation_logic": {
+        "and_conditions": [
+          {
+            "parameter": "riser_height",
+            "operator": "<=",
+            "threshold": 0.23,
+            "unit": "m"
+          },
+          {
+            "parameter": "tread_depth",
+            "operator": ">=",
+            "threshold": 0.15,
+            "unit": "m"
+          }
+        ]
+      },
+      "error_message": "階段の寸法が住宅の基準を満たしていません（蹴上げ≦0.23m, 踏面≧0.15m）。"
+    },
+    {
+      "id": "RULE_03_LIGHTING",
+      "law_reference": "建築基準法 第28条 (Article 28)",
+      "category": "Lighting",
+      "target_object": "Window",
+      "parent_object": "Room_Floor",
+      "description": "居室には、床面積の1/7以上の有効採光面積を持つ窓を設けなければならない。",
+      "validation_logic": {
+        "type": "ratio_comparison",
+        "numerator": "window_area",
+        "denominator": "floor_area",
+        "operator": ">=",
+        "threshold": 0.142857,
+        "note": "1/7 approx 0.1428"
+      },
+      "error_message": "採光面積が不足しています。窓を大きくするか数を増やして、床面積の1/7以上確保してください。"
+    }
+  ]
+}
