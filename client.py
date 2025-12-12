@@ -191,8 +191,8 @@ async def run_chat_loop():
 def main():
     """エントリーポイント"""
     # Windows等の非同期ループ対応
-    if os.name == 'nt':
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    # if os.name == 'nt':
+    #     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     asyncio.run(run_chat_loop())
 
 
