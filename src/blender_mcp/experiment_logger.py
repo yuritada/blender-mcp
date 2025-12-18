@@ -135,3 +135,36 @@ class ExperimentLogger:
             pass
         
         return stats
+
+
+# グローバルなシングルトンインスタンス
+_global_logger = None
+
+def get_experiment_logger(log_dir: str = "logs") -> Optional[ExperimentLogger]:
+    """
+    アプリケーション全体で共有されるロガーインスタンスを取得または作成する
+    ※ main.py で初期化された後は、引数なしで呼べば同じインスタンスが返ります
+    """
+    global _global_logger
+    if _global_logger is None:
+        # まだ作成されていない場合は新規作成（環境変数をチェック）
+        import os
+        # .envファイルからの設定を優先的にチェック
+        experiment_log_enabled = os.environ.get("BLENDER_MCP_EXPERIMENT_LOG", "false").lower()
+        if experiment_log_enabled not in ["true", "1", "yes", "on"]:
+            return None
+        
+        # ログディレクトリも環境変数から取得
+        actual_log_dir = os.environ.get("BLENDER_MCP_LOG_DIR", log_dir)
+        
+        try:
+            _global_logger = ExperimentLogger(actual_log_dir)
+        except Exception as e:
+            print(f"Warning: Failed to initialize ExperimentLogger: {e}")
+            return None
+    return _global_logger
+
+def set_global_logger(logger: Optional[ExperimentLogger]):
+    """main.pyから呼ばれる：グローバルロガーを設定"""
+    global _global_logger
+    _global_logger = logger

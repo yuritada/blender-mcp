@@ -2,9 +2,11 @@
 
 # 不要な import は削除し、以下のようにシンプルにします
 from blender_mcp.connect import mcp, logger
-from blender_mcp.experiment_logger import ExperimentLogger
+from blender_mcp.experiment_logger import ExperimentLogger, set_global_logger
 import os
 import sys
+from pathlib import Path
+from dotenv import load_dotenv
 
 # 重要: 各モジュールを import することで、@mcp.tool デコレータが実行され、
 # mcp オブジェクトにツールが登録されます。
@@ -27,9 +29,15 @@ def initialize_experiment_logging():
     # 環境変数でログ機能を有効化できるようにする
     if os.environ.get("BLENDER_MCP_EXPERIMENT_LOG", "false").lower() == "true":
         log_dir = os.environ.get("BLENDER_MCP_LOG_DIR", "logs")
-        experiment_logger = ExperimentLogger(log_dir)
-        logger.info(f"実験ログを有効化しました: {experiment_logger.get_log_file_path()}")
-        return experiment_logger
+        try:
+            experiment_logger = ExperimentLogger(log_dir)
+            # グローバルシングルトンに設定
+            set_global_logger(experiment_logger)
+            logger.info(f"実験ログを有効化しました: {experiment_logger.get_log_file_path()}")
+            return experiment_logger
+        except Exception as e:
+            logger.error(f"実験ロガーの初期化に失敗しました: {e}")
+            return None
     return None
 
 # MCPツールの実行をインターセプトするためのラッパー
@@ -51,8 +59,31 @@ def wrap_tool_execution():
     except Exception as e:
         logger.warning(f"ツール実行のフック設定に失敗: {e}")
 
+def load_environment():
+    """プロジェクトの.envファイルを読み込む"""
+    # プロジェクトルートの.envファイルを探す
+    current_dir = Path(__file__).resolve()
+    project_root = None
+    
+    # 上位ディレクトリを辿って.envファイルを探す
+    for parent in current_dir.parents:
+        env_file = parent / ".env"
+        if env_file.exists():
+            project_root = parent
+            break
+    
+    if project_root:
+        env_file = project_root / ".env"
+        load_dotenv(env_file)
+        logger.info(f".envファイルを読み込みました: {env_file}")
+    else:
+        logger.warning(".envファイルが見つかりません。環境変数を直接設定してください。")
+
 def main():
     """Run the MCP server"""
+    # .envファイルを最初に読み込む
+    load_environment()
+    
     # 実験ログの初期化
     exp_logger = initialize_experiment_logging()
     

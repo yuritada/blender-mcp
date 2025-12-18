@@ -12,6 +12,7 @@ from pathlib import Path
 import base64
 from urllib.parse import urlparse
 from ..connect import get_blender_connection, mcp, logger  # <-- mcpとloggerを追加
+from ..experiment_logger import get_experiment_logger  # 実験ロガーを追加
 
 @mcp.tool()
 def execute_blender_code(ctx: Context, code: str) -> str:
@@ -21,27 +22,50 @@ def execute_blender_code(ctx: Context, code: str) -> str:
     Parameters:
     - code: The Python code to execute
     """
+    # ツール実行開始時にロガーを取得
+    exp_logger = get_experiment_logger()
+    
     try:
         # Get the global connection
         blender = get_blender_connection()
         result = blender.send_command("execute_code", {"code": code})
+        
+        # 成功ログを記録
+        if exp_logger:
+            exp_logger.log_tool_call("execute_blender_code", {"code": code}, result)
+            
         return f"Code executed successfully: {result.get('result', '')}"
     except Exception as e:
         logger.error(f"Error executing code: {str(e)}")
+        
+        # エラーログを記録
+        if exp_logger:
+            exp_logger.log_error("EXECUTION_ERROR", str(e), {"tool": "execute_blender_code", "code": code})
+            
         return f"Error executing code: {str(e)}"
 
 
 @mcp.tool()
 def get_scene_info(ctx: Context) -> str:
     """Get detailed information about the current Blender scene"""
+    exp_logger = get_experiment_logger()
+    
     try:
         blender = get_blender_connection()
         result = blender.send_command("get_scene_info")
+        
+        # ログ記録
+        if exp_logger:
+            exp_logger.log_tool_call("get_scene_info", {}, result)
         
         # Just return the JSON representation of what Blender sent us
         return json.dumps(result, indent=2)
     except Exception as e:
         logger.error(f"Error getting scene info from Blender: {str(e)}")
+        
+        if exp_logger:
+            exp_logger.log_error("SCENE_INFO_ERROR", str(e), {"tool": "get_scene_info"})
+        
         return f"Error getting scene info: {str(e)}"
 
 
@@ -119,6 +143,7 @@ def set_object_dimensions(ctx: Context, object_name: str, width_x: float = None,
         depth_y: Y軸方向の奥行き (m) - 変更しない場合はNone
         height_z: Z軸方向の高さ (m) - 変更しない場合はNone
     """
+    exp_logger = get_experiment_logger()
     blender = get_blender_connection()
     
     # 変更するパラメータのみを含む辞書を作成
@@ -128,7 +153,10 @@ def set_object_dimensions(ctx: Context, object_name: str, width_x: float = None,
     if height_z is not None: dims['z'] = height_z
     
     if not dims:
-        return "警告: 変更する寸法が指定されていません。"
+        warning_msg = "警告: 変更する寸法が指定されていません。"
+        if exp_logger:
+            exp_logger.log_error("DIMENSION_ERROR", "No dimensions specified", {"tool": "set_object_dimensions", "object": object_name})
+        return warning_msg
 
     # Blender内で実行するPythonコード
     # dimensionsプロパティに直接値を代入することで、Scaleを自動的に逆算させます
@@ -161,9 +189,34 @@ except Exception as e:
     
     # execute_code ではなく、このロジックを直接送るか、あるいは execute_code 経由で実行
     # ここでは既存の仕組みに合わせて send_command か execute_code を使用
-    result = blender.send_command("execute_code", {"code": code})
+    try:
+        result = blender.send_command("execute_code", {"code": code})
+        
+        if "error" in result:
+            if exp_logger:
+                exp_logger.log_error("DIMENSION_SET_ERROR", result['error'], {
+                    "tool": "set_object_dimensions", 
+                    "object": object_name,
+                    "dimensions": dims
+                })
+            return f"エラー: {result['error']}"
+        
+        # 成功ログ
+        if exp_logger:
+            exp_logger.log_tool_call("set_object_dimensions", {
+                "object_name": object_name,
+                "width_x": width_x,
+                "depth_y": depth_y,
+                "height_z": height_z
+            }, result)
+        
+        return f"寸法を更新しました: {result.get('result', '')}"
     
-    if "error" in result:
-        return f"エラー: {result['error']}"
-    
-    return f"寸法を更新しました: {result.get('result', '')}"
+    except Exception as e:
+        if exp_logger:
+            exp_logger.log_error("DIMENSION_SET_EXCEPTION", str(e), {
+                "tool": "set_object_dimensions",
+                "object": object_name,
+                "dimensions": dims
+            })
+        return f"エラー: {str(e)}"

@@ -6,7 +6,29 @@
 
 ## ログ機能の有効化
 
-環境変数を設定してサーバーを起動します：
+### 方法1: .envファイルを使用（推奨）
+
+プロジェクトルートの`.env`ファイルを編集してログ機能を制御します：
+
+```bash
+# .env ファイルの編集
+BLENDER_MCP_EXPERIMENT_LOG=true    # ログ機能を有効化
+BLENDER_MCP_LOG_DIR=logs           # ログファイルの保存先
+
+# サーバー起動
+python -m blender_mcp
+```
+
+実験を開始する前に：
+```bash
+# .envファイルでログを有効化
+sed -i 's/BLENDER_MCP_EXPERIMENT_LOG=false/BLENDER_MCP_EXPERIMENT_LOG=true/' .env
+
+# 実験終了後にログを無効化
+sed -i 's/BLENDER_MCP_EXPERIMENT_LOG=true/BLENDER_MCP_EXPERIMENT_LOG=false/' .env
+```
+
+### 方法2: 環境変数で直接設定
 
 ```bash
 # Windowsの場合 (PowerShell)
@@ -82,8 +104,30 @@ def analyze_log(log_file):
 analyze_log('logs/experiment_log_20251218_103045.jsonl')
 ```
 
+## 設定値の詳細
+
+### BLENDER_MCP_EXPERIMENT_LOG
+
+ログ機能の有効/無効を制御します。以下の値で `true` と判定されます：
+
+- `true`, `True`, `TRUE`
+- `1`
+- `yes`, `Yes`, `YES`
+- `on`, `On`, `ON`
+
+その他の値（`false`, `0`, `no`, `off`, 空文字など）は `false` として扱われます。
+
+### BLENDER_MCP_LOG_DIR
+
+ログファイルの保存先ディレクトリを指定します。
+
+- **デフォルト**: `logs`
+- **相対パス**: プロジェクトルートからの相対パス
+- **絶対パス**: システム上の任意の場所
+
 ## 注意事項
 
 - ログ機能は開発・実験用です。本番環境では無効化することを推奨します。
 - ログファイルは自動的に削除されないため、定期的に手動で管理してください。
 - ログにはBlenderシーンの詳細情報が含まれる可能性があります。
+- `.env`ファイルの変更後は、サーバーを再起動する必要があります。

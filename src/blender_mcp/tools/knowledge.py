@@ -2,6 +2,7 @@ import json
 import os
 from mcp.server.fastmcp import Context
 from ..connect import mcp, logger
+from ..experiment_logger import get_experiment_logger
 
 # パスの構築: tools -> blender_mcp -> src -> project_root
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -58,11 +59,18 @@ def add_architectural_rule(ctx: Context, category: str, description: str) -> str
     - category: ルールの対象（例: 'Roof', 'Wall'）
     - description: ルールの具体的な内容（例: '屋根の傾斜は30度以上が望ましい'）
     """
+    exp_logger = get_experiment_logger()
     rules = _load_rules()
     
     # 重複チェック（簡易的）
     for r in rules:
         if r["description"] == description:
+            if exp_logger:
+                exp_logger.log_error("DUPLICATE_RULE", "Rule already exists", {
+                    "tool": "add_architectural_rule",
+                    "category": category,
+                    "description": description
+                })
             return "そのルールは既に存在します。"
 
     new_id = max([r.get("id", 0) for r in rules], default=0) + 1
@@ -75,6 +83,21 @@ def add_architectural_rule(ctx: Context, category: str, description: str) -> str
     rules.append(new_rule)
     
     if _save_rules(rules):
+        # 成功ログ
+        if exp_logger:
+            exp_logger.log_tool_call("add_architectural_rule", {
+                "category": category,
+                "description": description,
+                "new_id": new_id
+            }, new_rule)
+            
         return f"新しいルールを追加しました (ID: {new_id}): [{category}] {description}"
     else:
+        # 保存失敗ログ
+        if exp_logger:
+            exp_logger.log_error("RULE_SAVE_FAILED", "Failed to save rule", {
+                "tool": "add_architectural_rule",
+                "category": category,
+                "description": description
+            })
         return "ルールの保存に失敗しました。"

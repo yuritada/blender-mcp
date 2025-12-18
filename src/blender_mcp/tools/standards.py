@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from mcp.server.fastmcp import Context
 from ..connect import get_blender_connection, mcp, logger
+from ..experiment_logger import get_experiment_logger
 
 # 基準ファイルのパス設定
 # __file__ (standards.py) -> tools -> blender_mcp -> src -> project_root -> json_data
@@ -42,6 +43,8 @@ def get_building_standards(ctx: Context, category: str = None) -> str:
     建築基準法データベース(building_standards.json)を検索します。
     LLMはこの情報を元に、どのような制約を守るべきかを理解します。
     """
+    exp_logger = get_experiment_logger()
+    
     data = _load_standards()
     rules = data.get("regulations", [])
     metadata = data.get("metadata", {})
@@ -83,16 +86,37 @@ def get_building_standards(ctx: Context, category: str = None) -> str:
             available_categories = list(set([r.get("category", "") for r in rules if r.get("category")]))
             available_ids = [r.get("id", "") for r in rules]
             
-            return (
+            error_msg = (
                 f"指定されたカテゴリ '{category}' に該当する建築基準は見つかりませんでした。\n"
                 f"利用可能なカテゴリ: {', '.join(available_categories)}\n"
                 f"利用可能なルールID: {', '.join(available_ids)}\n"
                 f"ヒント: 全ルールを取得するにはcategoryを指定せずに呼び出してください。"
             )
+            
+            # 検索失敗をログ記録
+            if exp_logger:
+                exp_logger.log_error("SEARCH_NO_MATCH", f"Category '{category}' not found", {
+                    "tool": "get_building_standards",
+                    "category": category,
+                    "available_categories": available_categories
+                })
+            
+            return error_msg
+        
+        # 成功ログを記録
+        if exp_logger:
+            exp_logger.log_tool_call("get_building_standards", 
+                                   {"category": category}, 
+                                   {"matched_count": len(matched_rules)})
         
         return json.dumps(matched_rules, indent=2, ensure_ascii=False)
 
     # カテゴリ指定なしの場合は全ルールを返す
+    if exp_logger:
+        exp_logger.log_tool_call("get_building_standards", 
+                               {"category": None}, 
+                               {"total_rules": len(rules)})
+    
     return json.dumps(rules, indent=2, ensure_ascii=False)
 
 @mcp.tool()
@@ -100,6 +124,8 @@ def validate_object_compliance(ctx: Context, object_name: str, rule_id: str) -> 
     """
     指定されたBlenderオブジェクトが、特定の建築基準(rule_id)を満たしているか検証します。
     """
+    exp_logger = get_experiment_logger()
+    
     # 1. ルールの取得
     data = _load_standards()
     regulations = data.get("regulations", [])
@@ -110,13 +136,24 @@ def validate_object_compliance(ctx: Context, object_name: str, rule_id: str) -> 
     # ルールIDの存在確認
     if rule_id not in valid_ids:
         # AIへの明確な指導メッセージを含める
-        return (
+        error_msg = (
             f"エラー: ルールID '{rule_id}' は現在の基準セットに存在しません。\n"
             f"有効なルールID: {', '.join(valid_ids)}\n"
             f"正しいルールIDを確認するには、先に 'get_building_standards' を呼び出してください。\n"
             f"例: get_building_standards() で全ルールを取得するか、\n"
             f"    get_building_standards(category='stairs') のようにカテゴリで検索してください。"
         )
+        
+        # ハルシネーションエラーをログ記録
+        if exp_logger:
+            exp_logger.log_error("HALLUCINATION_ERROR", f"Invalid rule ID: {rule_id}", {
+                "tool": "validate_object_compliance",
+                "object": object_name,
+                "invalid_rule_id": rule_id,
+                "valid_ids": valid_ids
+            })
+        
+        return error_msg
     
     # ルールの取得
     rule = next((r for r in regulations if r.get("id") == rule_id), None)
@@ -187,6 +224,15 @@ def validate_object_compliance(ctx: Context, object_name: str, rule_id: str) -> 
     is_all_passed = all("合格" in r and "不合格" not in r and "判定不能" not in r for r in results)
     
     summary = "✅ 検証合格" if is_all_passed else "❌ 検証不合格"
+    
+    # 検証結果をログ記録
+    if exp_logger:
+        exp_logger.log_validation_result(
+            object_name, 
+            rule_id, 
+            is_all_passed, 
+            f"{summary} - {rule.get('description', '')}"
+        )
 
     return f"""
 検証レポート:
