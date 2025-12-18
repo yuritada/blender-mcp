@@ -5,7 +5,8 @@
     "target_building_type": "Detached Residential House (General)",
     "unit_system": "metric (meters)",
     "version": "1.0.0",
-    "last_updated": "2025-12-12"
+    "last_updated": "2025-12-12",
+    "keywords": ["house", "residential", "home", "dwelling", "architecture", "japan", "building", "standards", "戸建て", "住宅", "建築基準"]
   },
   "regulations": [
     {

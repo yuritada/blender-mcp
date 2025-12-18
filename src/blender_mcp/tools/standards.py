@@ -4,8 +4,9 @@ from mcp.server.fastmcp import Context
 from ..connect import get_blender_connection, mcp, logger
 
 # 基準ファイルのパス設定
-CURRENT_DIR = Path(__file__).parent.parent
-STANDARDS_FILE = CURRENT_DIR / "building_standards.json"
+# __file__ (standards.py) -> tools -> blender_mcp -> src -> project_root -> json_data
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+STANDARDS_FILE = PROJECT_ROOT / "json_data" / "building_standards.json"
 
 def _load_standards():
     """JSONファイルを読み込むヘルパー関数"""
@@ -43,13 +44,55 @@ def get_building_standards(ctx: Context, category: str = None) -> str:
     """
     data = _load_standards()
     rules = data.get("regulations", [])
+    metadata = data.get("metadata", {})
 
     if category:
-        filtered = [r for r in rules if r.get("category", "").lower() == category.lower()]
-        if not filtered:
-            return f"カテゴリ '{category}' に該当する建築基準は見つかりませんでした。"
-        return json.dumps(filtered, indent=2, ensure_ascii=False)
+        # 検索クエリを小文字に変換
+        query = category.lower()
+        
+        # 部分一致検索の実装
+        matched_rules = []
+        for rule in rules:
+            # 各ルールの検索対象テキストを構築
+            search_text = (
+                rule.get("category", "").lower() + " " +
+                rule.get("description", "").lower() + " " +
+                rule.get("target_object", "").lower()
+            ).strip()
+            
+            # クエリが含まれているかチェック
+            if query in search_text:
+                matched_rules.append(rule)
+        
+        # メタデータのキーワードもチェック
+        if not matched_rules:
+            keywords = metadata.get("keywords", [])
+            metadata_text = (
+                metadata.get("title", "").lower() + " " +
+                metadata.get("description", "").lower() + " " +
+                " ".join([kw.lower() for kw in keywords])
+            ).strip()
+            
+            if query in metadata_text:
+                # キーワードにマッチした場合は全ルールを返す
+                matched_rules = rules
+        
+        # 結果の処理
+        if not matched_rules:
+            # 見つからない場合は、利用可能なカテゴリのリストをヒントとして提供
+            available_categories = list(set([r.get("category", "") for r in rules if r.get("category")]))
+            available_ids = [r.get("id", "") for r in rules]
+            
+            return (
+                f"指定されたカテゴリ '{category}' に該当する建築基準は見つかりませんでした。\n"
+                f"利用可能なカテゴリ: {', '.join(available_categories)}\n"
+                f"利用可能なルールID: {', '.join(available_ids)}\n"
+                f"ヒント: 全ルールを取得するにはcategoryを指定せずに呼び出してください。"
+            )
+        
+        return json.dumps(matched_rules, indent=2, ensure_ascii=False)
 
+    # カテゴリ指定なしの場合は全ルールを返す
     return json.dumps(rules, indent=2, ensure_ascii=False)
 
 @mcp.tool()
@@ -59,9 +102,24 @@ def validate_object_compliance(ctx: Context, object_name: str, rule_id: str) -> 
     """
     # 1. ルールの取得
     data = _load_standards()
-    rule = next((r for r in data.get("regulations", []) if r["id"] == rule_id), None)
-    if not rule:
-        return f"エラー: ルールID '{rule_id}' は見つかりませんでした。"
+    regulations = data.get("regulations", [])
+    
+    # 利用可能なルールIDのリストを作成
+    valid_ids = [r.get("id", "") for r in regulations]
+    
+    # ルールIDの存在確認
+    if rule_id not in valid_ids:
+        # AIへの明確な指導メッセージを含める
+        return (
+            f"エラー: ルールID '{rule_id}' は現在の基準セットに存在しません。\n"
+            f"有効なルールID: {', '.join(valid_ids)}\n"
+            f"正しいルールIDを確認するには、先に 'get_building_standards' を呼び出してください。\n"
+            f"例: get_building_standards() で全ルールを取得するか、\n"
+            f"    get_building_standards(category='stairs') のようにカテゴリで検索してください。"
+        )
+    
+    # ルールの取得
+    rule = next((r for r in regulations if r.get("id") == rule_id), None)
 
     # 2. Blenderからオブジェクト情報の取得
     blender = get_blender_connection()

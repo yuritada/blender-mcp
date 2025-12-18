@@ -3,8 +3,13 @@ import os
 from mcp.server.fastmcp import Context
 from ..connect import mcp, logger
 
-# ルールファイルのパス（プロジェクトルートにあると仮定）
-RULES_FILE = "building_standards.json"
+# パスの構築: tools -> blender_mcp -> src -> project_root
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+JSON_DIR = os.path.join(BASE_DIR, "json_data")
+RULES_FILE = os.path.join(JSON_DIR, "rules.json")
+
+# ディレクトリが存在しない場合は作成（安全策）
+os.makedirs(JSON_DIR, exist_ok=True)
 
 def _load_rules():
     if not os.path.exists(RULES_FILE):
@@ -28,7 +33,7 @@ def _save_rules(rules):
 @mcp.tool()
 def get_architectural_rules(ctx: Context, category: str = None) -> str:
     """
-    建築ルールブック（building_standards.json）を読み込みます。
+    建築ルールブック（rules.json）を読み込みます。
     
     Parameters:
     - category: (Optional) 特定のカテゴリ（例: 'Door', 'Window'）のみフィルタリングして取得します。指定がない場合は全ルールを返します。
@@ -46,7 +51,7 @@ def get_architectural_rules(ctx: Context, category: str = None) -> str:
 @mcp.tool()
 def add_architectural_rule(ctx: Context, category: str, description: str) -> str:
     """
-    新しい建築ルールをルールブック（building_standards.json）に追加します。
+    新しい建築ルールをルールブック（rules.json）に追加します。
     自律的な判断で、将来のために保存すべきルールを発見した場合に使用してください。
     
     Parameters:
