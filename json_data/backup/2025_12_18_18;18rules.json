@@ -1,0 +1,12 @@
+[
+  {
+    "id": 1,
+    "category": "Wall",
+    "description": "Walls should be at least 3m tall for compliance with interior space height requirements."
+  },
+  {
+    "id": 2,
+    "category": "Door",
+    "description": "ドアの有効開口幅は0.75m以上であることが必要です"
+  }
+]
