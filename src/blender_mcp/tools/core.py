@@ -105,3 +105,65 @@ def get_viewport_screenshot(ctx: Context, max_size: int = 800) -> Image:
     except Exception as e:
         logger.error(f"Error capturing screenshot: {str(e)}")
         raise Exception(f"Screenshot failed: {str(e)}")
+
+
+@mcp.tool()
+def set_object_dimensions(ctx: Context, object_name: str, width_x: float = None, depth_y: float = None, height_z: float = None) -> str:
+    """
+    指定したオブジェクトの絶対寸法（実寸メートル）を設定します。
+    重要: サイズ変更の際は、倍率計算のミスを防ぐため、scale操作ではなく必ずこのツールを使用してください。
+    
+    Args:
+        object_name: 対象のオブジェクト名
+        width_x: X軸方向の幅 (m) - 変更しない場合はNone
+        depth_y: Y軸方向の奥行き (m) - 変更しない場合はNone
+        height_z: Z軸方向の高さ (m) - 変更しない場合はNone
+    """
+    blender = get_blender_connection()
+    
+    # 変更するパラメータのみを含む辞書を作成
+    dims = {}
+    if width_x is not None: dims['x'] = width_x
+    if depth_y is not None: dims['y'] = depth_y
+    if height_z is not None: dims['z'] = height_z
+    
+    if not dims:
+        return "警告: 変更する寸法が指定されていません。"
+
+    # Blender内で実行するPythonコード
+    # dimensionsプロパティに直接値を代入することで、Scaleを自動的に逆算させます
+    code = f"""
+import bpy
+try:
+    obj = bpy.data.objects.get('{object_name}')
+    if not obj:
+        print(f"Error: Object '{object_name}' not found")
+    else:
+        # 現在の寸法を取得
+        current_dims = list(obj.dimensions)
+        
+        # 指定された軸のみ更新
+        new_dims = current_dims[:]
+        {'new_dims[0] = ' + str(width_x) if width_x is not None else ''}
+        {'new_dims[1] = ' + str(depth_y) if depth_y is not None else ''}
+        {'new_dims[2] = ' + str(height_z) if height_z is not None else ''}
+        
+        # dimensionsに代入（これで実寸が確定する）
+        obj.dimensions = new_dims
+        
+        # 変更を適用（Scaleを1.0にリセットしたい場合。実験によっては不要だが、安全のため推奨）
+        # bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+        
+        print(f"Updated dimensions for {{obj.name}}: {{list(obj.dimensions)}}")
+except Exception as e:
+    print(f"Error setting dimensions: {{e}}")
+"""
+    
+    # execute_code ではなく、このロジックを直接送るか、あるいは execute_code 経由で実行
+    # ここでは既存の仕組みに合わせて send_command か execute_code を使用
+    result = blender.send_command("execute_code", {"code": code})
+    
+    if "error" in result:
+        return f"エラー: {result['error']}"
+    
+    return f"寸法を更新しました: {result.get('result', '')}"
