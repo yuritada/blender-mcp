@@ -159,6 +159,36 @@
         "unit": "m"
       },
       "error_message": "ドアの高さが1.8m未満です。頭部衝突のリスクがあります。"
+    },
+    {
+      "id": "EXP_RULE_DOOR_GROUND",
+      "law_reference": "実験用ルール (Ground Contact)",
+      "category": "Door",
+      "target_object": "Door",
+      "severity": "CRITICAL",
+      "description": "ドアの底面は、人が通行するため地面（Z=0）に接していなければならない（許容誤差0.05m）。",
+      "validation_logic": {
+        "parameter": "position_z_bottom",
+        "operator": "<=",
+        "threshold": 0.05,
+        "unit": "m"
+      },
+      "error_message": "ドアが地面から浮いています。Z座標を下げて接地させてください。"
+    },
+    {
+      "id": "EXP_RULE_WINDOW_HEIGHT",
+      "law_reference": "実験用ルール (Fall Prevention)",
+      "category": "Window",
+      "target_object": "Window",
+      "severity": "CRITICAL",
+      "description": "窓の下端は、落下防止のため地面から1.0m以上離れていなければならない。",
+      "validation_logic": {
+        "parameter": "position_z_bottom",
+        "operator": ">=",
+        "threshold": 1.0,
+        "unit": "m"
+      },
+      "error_message": "窓の位置が低すぎます。下端を地上1.0m以上に配置してください。"
     }
   ]
 }

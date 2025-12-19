@@ -11,19 +11,30 @@ from typing import Dict, Any, Optional
 class ExperimentLogger:
     """実験データを記録する専用ロガー"""
     
-    def __init__(self, log_dir: str = "logs"):
+    def __init__(self, log_dir: str = "logs", file_prefix: str = "experiment_log_", sub_dir: str = None):
         """
         ログディレクトリを初期化し、タイムスタンプ付きログファイルを作成
         
         Args:
-            log_dir: ログファイルを保存するディレクトリ
+            log_dir: ログファイルを保存するベースディレクトリ
+            file_prefix: ログファイル名の接頭辞 (例: "client_log_", "server_log_")
+            sub_dir: サブディレクトリ名 (例: "client", "server") - Noneの場合はベースディレクトリ直下
         """
-        self.log_dir = Path(log_dir)
-        self.log_dir.mkdir(exist_ok=True)
+        self.base_dir = Path(log_dir)
+        
+        # サブディレクトリが指定されている場合は、それを作成
+        if sub_dir:
+            self.log_dir = self.base_dir / sub_dir
+        else:
+            self.log_dir = self.base_dir
+        
+        # ディレクトリを作成（親ディレクトリも含めて）
+        self.log_dir.mkdir(parents=True, exist_ok=True)
         
         # タイムスタンプ付きファイル名
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.log_file = self.log_dir / f"experiment_log_{timestamp}.jsonl"
+        # 指定されたプレフィックスを使用
+        self.log_file = self.log_dir / f"{file_prefix}{timestamp}.jsonl"
         
         # セッション情報の記録
         self.session_id = timestamp
@@ -140,7 +151,7 @@ class ExperimentLogger:
 # グローバルなシングルトンインスタンス
 _global_logger = None
 
-def get_experiment_logger(log_dir: str = "logs") -> Optional[ExperimentLogger]:
+def get_experiment_logger(log_dir: str = "logs", file_prefix: str = "experiment_log_", sub_dir: str = None) -> Optional[ExperimentLogger]:
     """
     アプリケーション全体で共有されるロガーインスタンスを取得または作成する
     ※ main.py で初期化された後は、引数なしで呼べば同じインスタンスが返ります
@@ -158,7 +169,7 @@ def get_experiment_logger(log_dir: str = "logs") -> Optional[ExperimentLogger]:
         actual_log_dir = os.environ.get("BLENDER_MCP_LOG_DIR", log_dir)
         
         try:
-            _global_logger = ExperimentLogger(actual_log_dir)
+            _global_logger = ExperimentLogger(actual_log_dir, file_prefix, sub_dir)
         except Exception as e:
             print(f"Warning: Failed to initialize ExperimentLogger: {e}")
             return None

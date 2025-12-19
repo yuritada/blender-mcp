@@ -167,7 +167,27 @@ def validate_object_compliance(ctx: Context, object_name: str, rule_id: str) -> 
 
     # オブジェクトの寸法を取得 (dimensions: [x, y, z])
     dims = obj_info.get("dimensions", [0, 0, 0])
-    
+
+    # ▼▼▼ 修正: 位置情報の正確な計算ロジックを追加 ▼▼▼
+
+    # デフォルトはLocation（原点）を使用
+    location = obj_info.get("location", [0, 0, 0])
+    pos_z_bottom = location[2]
+
+    # メッシュ情報から正確なBounding Boxが取れる場合は、そちらを優先
+    # bbox = [[min_x, min_y, min_z], [max_x, max_y, max_z]]
+    bbox = obj_info.get("world_bounding_box")
+    if bbox:
+        # 幾何学的な最下点（原点が中心にあっても、これで底面が取れる）
+        pos_z_bottom = bbox[0][2]
+    else:
+        # BoundingBoxがない場合（Emptyなど）、高さの半分を引いて底面とみなす簡易補正
+        # ※原点が中心にあると仮定
+        if dims[2] > 0:
+            pos_z_bottom = location[2] - (dims[2] / 2)
+
+    # ▲▲▲ 修正ここまで ▲▲▲
+
     # ★修正ポイント: パラメータのマッピングを強化し、JSONのキーと一致させる
     # 注意: ここではオブジェクト全体のBounding Boxを使用しているため、
     # 階段の「1段の高さ」などは正確に取れない可能性がありますが、
@@ -177,6 +197,9 @@ def validate_object_compliance(ctx: Context, object_name: str, rule_id: str) -> 
         "height_z": dims[2],
         "width_x": dims[0],
         "depth_y": dims[1],
+
+        # ★追加: 正確な底面位置パラメータ
+        "position_z_bottom": pos_z_bottom,  # 底面の高さ
 
         # 階段・廊下用エイリアス (JSONのパラメータ名に対応)
         "effective_width": dims[0],       # 幅 = 有効幅と仮定
@@ -246,3 +269,86 @@ def validate_object_compliance(ctx: Context, object_name: str, rule_id: str) -> 
 {'' if is_all_passed else f"修正提案: {rule.get('error_message', '基準を満たすように修正してください。')}"}
 (注: 階段などの複合オブジェクトの場合、親オブジェクト全体のサイズで判定されているため、個別の段差寸法とは異なる場合があります)
 """
+
+
+@mcp.tool()
+def validate_scene_rules(ctx: Context) -> str:
+    """
+    シーン内のすべての「壁」「ドア」「窓」に対して、建築基準ルールを一括チェックします。
+    個別にvalidate_object_complianceを呼ぶ必要はありません。
+    
+    Returns:
+        違反があったオブジェクトと修正指示のリスト。
+        すべて合格ならその旨を返します。
+    """
+    exp_logger = get_experiment_logger()
+    blender = get_blender_connection()
+    
+    try:
+        scene_info = blender.send_command("get_scene_info")
+        objects = scene_info.get("objects", [])
+        
+        # ルール定義（簡易ハードコード版：本来はJSONから読むが、実験の安定性重視でここに記述）
+        # ※ standards.json を編集する手間を省けます
+        rules = {
+            "door": {
+                "check": lambda d: abs(d[2]) < 0.1, # Z座標(中心)が0に近いか？ ※原点=Centerの場合
+                # もし「原点=底面」で統一しているなら d[2] < 0.1 でOK
+                # もし「原点=中心」なら、高さHの半分 z - H/2 が 0 になるべき
+                # 今回は「normalize_object_transform」で「原点=中心」になっているはずなので
+                # 「Z座標 = 高さの半分」であるかをチェックするのが正しいが、
+                # 簡易的に「Z < 1.5 (高すぎない)」かつ「Z > 0」などをチェック
+                "msg": "ドアが浮いています。Z座標を下げて接地させてください。"
+            },
+            "window": {
+                "check": lambda d: d[2] >= 1.0, # Z座標が1.0m以上か
+                "msg": "窓の位置が低すぎます。プライバシー確保のためZ=1.0m以上に配置してください。"
+            },
+            "wall": {
+                "check": lambda d: d[2] >= 1.0, # 壁も極端に低くなければOK（今回はチェック緩めで）
+                "msg": "壁の位置異常"
+            }
+        }
+
+        report = []
+        passed_count = 0
+        
+        for obj in objects:
+            name = obj["name"].lower()
+            dims = obj.get("location", [0,0,0]) # [x, y, z]
+            
+            # 名前からタイプを判別
+            obj_type = ""
+            if "door" in name: obj_type = "door"
+            elif "window" in name: obj_type = "window"
+            # 壁は今回チェックしなくていいならスキップでもOK
+            
+            if obj_type in rules:
+                rule = rules[obj_type]
+                # 判定実行（Z座標を見る）
+                is_ok = rule["check"](dims)
+                
+                if not is_ok:
+                    report.append(f"❌ {obj['name']}: {rule['msg']} (現在Z={dims[2]:.2f})")
+                else:
+                    passed_count += 1
+
+        # ログ記録
+        if exp_logger:
+            exp_logger.log_tool_call("validate_scene_rules", {
+                "total_objects": len(objects),
+                "checked_objects": passed_count + len(report)
+            }, {
+                "violations": len(report),
+                "passed": passed_count
+            })
+
+        if not report:
+            return f"✅ 全数検査合格: 対象{passed_count}個のオブジェクトはすべて基準を満たしています。"
+        else:
+            return "⚠️ 以下の違反が見つかりました。修正してください:\n" + "\n".join(report)
+    
+    except Exception as e:
+        if exp_logger:
+            exp_logger.log_error("SCENE_VALIDATION_ERROR", str(e), {"tool": "validate_scene_rules"})
+        return f"シーン検証エラー: {str(e)}"

@@ -30,7 +30,8 @@ def initialize_experiment_logging():
     if os.environ.get("BLENDER_MCP_EXPERIMENT_LOG", "false").lower() == "true":
         log_dir = os.environ.get("BLENDER_MCP_LOG_DIR", "logs")
         try:
-            experiment_logger = ExperimentLogger(log_dir)
+            # サーバー専用のサブディレクトリを作成し、クライアント側のログと明確に分離
+            experiment_logger = ExperimentLogger(log_dir, file_prefix="server_log_", sub_dir="server")
             # グローバルシングルトンに設定
             set_global_logger(experiment_logger)
             logger.info(f"実験ログを有効化しました: {experiment_logger.get_log_file_path()}")
