@@ -102,6 +102,7 @@ def get_tool_display_message(name, args):
 
 SYSTEM_PROMPT = """
 あなたはBlenderのPythonスクリプト(bpy)のエキスパートです。
+あなたには、建築基準法とこれまで蓄えてきた知識ベースの2つのルールが与えられています。
 
 ## 重要な制約事項
 
@@ -112,13 +113,20 @@ SYSTEM_PROMPT = """
 2. **寸法設定**: 
    - オブジェクトのサイズ変更は `set_object_dimensions` ツールを使用してください
    - スケール操作による計算ミスを防ぐため、直接的な寸法指定を行います
-
+   - 現在の環境は、物体の操作点がオブジェクトの"中心"（オブジェクトのジオメトリの重心）にあることを前提としています
+     （例: 高さ2mのドアを地面(Z=0)に設置する場合、中心のZ座標は1.0mに設定してください）
 3. **検証**: 
    - 作業完了後は必ず `validate_object_compliance` で建築基準をチェックしてください
    - 検証失敗の場合は、適切にオブジェクトを修正してください
+   - また、知識ベース`get_architectural_rules` を呼び出し、過去に学習したルールにも適合しているか確認してください
 
 4. **問題解決**: 
    - 座標ズレや変形の問題が発生した場合は `normalize_object_transform` を使用してください
+
+5. **学習と記憶 (最重要)**:
+   - ユーザーからの指摘や、試行錯誤の末に成功した解決策は、将来のために保存する必要があります。
+   - 問題が解決したら、必ず `add_architectural_rule` を使用して、その知見をルール化してください。
+   - 作業開始時には `get_architectural_rules` を呼び出し、過去の失敗や成功パターンを確認してください。
 
 ## 利用可能なツール
 
@@ -176,6 +184,9 @@ async def run_chat_loop():
                 console.print(f"[dim]Loaded {len(ollama_tools)} tools from Blender MCP.[/dim]")
                 messages = [{'role': 'system', 'content': SYSTEM_PROMPT}]
 
+                # セッション開始ログ
+                logger.log_event("SESSION_START", {"system_prompt": SYSTEM_PROMPT})
+
                 # --- [変更] メインループを try...finally で囲む ---
                 try:
                     while True:
@@ -197,6 +208,12 @@ async def run_chat_loop():
 
                         messages.append({'role': 'user', 'content': user_input})
                         turn_count += 1
+
+                        # ★ユーザー入力のログ記録★
+                        logger.log_event("CHAT_USER", {
+                            "turn": turn_count,
+                            "content": user_input
+                        })
 
                         # AI応答生成
                         with console.status(
@@ -288,11 +305,17 @@ async def run_chat_loop():
 
                                 # 推論の続き（Re-Act）
                                 status.update("[bold green]Reasoning next step...[/bold green]")
-                                response = ollama.chat(
-                                    model=MODEL_NAME,
-                                    messages=messages,
-                                    tools=ollama_tools,
-                                )
+                                try:
+                                    response = ollama.chat(
+                                        model=MODEL_NAME,
+                                        messages=messages,
+                                        tools=ollama_tools,
+                                    )
+                                except Exception as e:
+                                    error_msg = f"Re-reasoning Error: {str(e)}"
+                                    console.print(f"[bold red]{error_msg}[/bold red]")
+                                    logger.log_error("LLM_REASONING_ERROR", error_msg)
+                                    break  # ツールループを抜ける
                                 messages.append(response.message)
 
                                 # --- [追加] トークン数を集計 (ツール後の再生成分) ---
@@ -312,6 +335,11 @@ async def run_chat_loop():
                         console.print("\n[bold magenta]AI:[/bold magenta]")
                         if ai_content:
                             console.print(Markdown(ai_content))
+                            # ★AI応答のログ記録★
+                            logger.log_event("CHAT_AI", {
+                                "turn": turn_count,
+                                "content": ai_content
+                            })
                         else:
                             console.print("[dim](No response content)[/dim]")
 
