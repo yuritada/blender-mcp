@@ -204,12 +204,24 @@ async def run_chat_loop():
                             spinner="dots"
                         ) as status:
                             
-                            # Ollama呼び出し
-                            response = ollama.chat(
-                                model=MODEL_NAME,
-                                messages=messages,
-                                tools=ollama_tools,
-                            )
+                            try:
+                                # Ollama呼び出し
+                                response = ollama.chat(
+                                    model=MODEL_NAME,
+                                    messages=messages,
+                                    tools=ollama_tools,
+                                )
+                            except ollama.ResponseError as e:
+                                # JSONパースエラーなどをキャッチしてループを継続させる
+                                logger.log_error("LLM_GENERATION_ERROR", str(e))
+                                console.print(f"[bold red]AI Generation Error:[/bold red] AIが不正なフォーマットを生成しました。もう一度試してください。\n[dim]詳細: {e}[/dim]")
+                                continue # 次のユーザー入力へ戻る
+                            except Exception as e:
+                                # その他の予期せぬエラー
+                                logger.log_error("UNEXPECTED_ERROR", str(e))
+                                console.print(f"[bold red]Unexpected Error:[/bold red] {e}")
+                                continue
+
                             messages.append(response.message)
 
                             # --- [追加] トークン数を集計 (初回生成分) ---
